@@ -2,19 +2,22 @@ package google
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"log"
 	"net/http"
 
+	"github.com/r7rainz/auramail/internal/auth"
+	"github.com/r7rainz/auramail/internal/user"
 	"golang.org/x/oauth2"
 )
 
 type Handler struct {
 	oauthConfig *oauth2.Config
+	userRepo    user.Repository
 }
 
 type GoogleUser struct {
-	Sub  string `json:"sub"`
+	Sub   string `json:"sub"`
 	Email string `json:"email"`
 	Name  string `json:"name"`
 }
@@ -39,35 +42,34 @@ func (h *Handler) GoogleCallback(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "missing code", http.StatusBadRequest)
 		return
 	}
+
 	ctx := r.Context()
 
 	token, err := h.oauthConfig.Exchange(ctx, codeStr)
 	if err != nil {
-		log.Printf("error message: %v", err)
-		http.Error(w, "error message", http.StatusInternalServerError)
+		log.Printf("exchange failed: %v", err)
+		http.Error(w, "oauth exchange failed", http.StatusInternalServerError)
 		return
 	}
 
-
-	_ = token
-
 	client := h.oauthConfig.Client(ctx, token)
-	response, err := client.Get("https://www.googleapis.com/oauth2/v3/userinfo")
+	resp, err := client.Get("https://www.googleapis.com/oauth2/v3/userinfo")
 	if err != nil {
-		log.Printf("userinfo request failed : %v", err)
+		log.Printf("userinfo request failed: %v", err)
 		http.Error(w, "failed to fetch user info", http.StatusInternalServerError)
 		return
 	}
+	defer resp.Body.Close()
 
-	defer response.Body.Close()
-	
-	if response.StatusCode != http.StatusOK{
+	if resp.StatusCode != http.StatusOK {
 		http.Error(w, "invalid google response", http.StatusUnauthorized)
+		return
 	}
 
-	body, err := ioutil.ReadAll(response.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		http.Error(w, "failed to read response", http.StatusInternalServerError)
+		return
 	}
 
 	var user GoogleUser
@@ -76,8 +78,32 @@ func (h *Handler) GoogleCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("google user : %s (%s)", user.Email, user.Sub)
+	log.Printf("google user: %s (%s)", user.Email, user.Sub)
 
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("google auth success"))
+	u, err := h.userRepo.FindOrCreateGoogleUser(
+		ctx,
+		user.Email,
+		user.Name,
+		user.Sub,
+	)
+	if err != nil {
+		http.Error(w, "failed to persist user", http.StatusInternalServerError)
+		return
+	}
+
+	accessToken, err := auth.GenerateAccessToken(
+		u.ID,
+		u.Email,
+		u.Name,
+	)
+
+	if err != nil {
+		http.Error(w, "failed to generate token", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"accessToken": accessToken,
+	})
 }
