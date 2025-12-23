@@ -2,6 +2,7 @@ package user
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -33,3 +34,19 @@ func (r *PostgresRepository) FindOrCreateGoogleUser(
 
 	return &u, nil
 }
+
+func (r *PostgresRepository) UpdateRefreshToken(
+	ctx context.Context, 
+	userID int, 
+	refreshToken string,
+) error {
+	query := `UPDATE users SET refresh_token = $1 WHERE id = #2;`
+
+	_, err := r.db.Exec(ctx, query, refreshToken, userID)
+	if err != nil {
+		return fmt.Errorf("failed to update refresh token for user %d: %w", userID, err)
+	}
+
+	return nil
+}
+

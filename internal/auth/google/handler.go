@@ -102,6 +102,18 @@ func (h *Handler) GoogleCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	refreshToken, err := auth.GenerateRefreshToken(u.ID, u.Email)
+	if err != nil {
+		http.Error(w, "failed to generate refresh token", http.StatusInternalServerError)
+		return
+	}
+
+	if err := h.userRepo.UpdateRefreshToken(ctx, u.ID, refreshToken); err != nil {
+		http.Error(w, "failed to persist refresh token", http.StatusInternalServerError)
+		return
+	}
+
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
 		"accessToken": accessToken,
