@@ -15,4 +15,8 @@ type Repository interface {
 		userID int, 
 		refreshToken string,	
 	) error
+
+	FindByRefreshToken(ctx context.Context, token string) (*User, error)
+	
+	ClearRefreshToken(ctx context.Context, userID int) error
 }

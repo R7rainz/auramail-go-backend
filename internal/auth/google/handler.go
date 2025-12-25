@@ -22,8 +22,8 @@ type GoogleUser struct {
 	Name  string `json:"name"`
 }
 
-func NewHandler(cfg *oauth2.Config) *Handler {
-	return &Handler{oauthConfig: cfg}
+func NewHandler(cfg *oauth2.Config, userRepo user.Repository) *Handler {
+	return &Handler{oauthConfig: cfg, userRepo: userRepo}
 }
 
 func (h *Handler) GoogleAuth(w http.ResponseWriter, r *http.Request) {
@@ -73,7 +73,7 @@ func (h *Handler) GoogleCallback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var user GoogleUser
-	if err := json.Unmarshal(body, &user); err != nil {
+	if error := json.Unmarshal(body, &user); error != nil {
 		http.Error(w, "invalid google user payload", http.StatusInternalServerError)
 		return
 	}
@@ -117,5 +117,11 @@ func (h *Handler) GoogleCallback(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
 		"accessToken": accessToken,
+		"refreshToken" : refreshToken,
 	})
+}
+
+func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("/auth/google", h.GoogleAuth)
+	mux.HandleFunc("/auth/google/callback", h.GoogleCallback)
 }

@@ -12,7 +12,7 @@ type PostgresRepository struct {
 }
 
 func NewPostgresRepository(db *pgxpool.Pool) *PostgresRepository {
-	return &PostgresRepository{}
+	return &PostgresRepository{db: db}
 }
 
 func (r *PostgresRepository) FindOrCreateGoogleUser(
@@ -40,7 +40,7 @@ func (r *PostgresRepository) UpdateRefreshToken(
 	userID int, 
 	refreshToken string,
 ) error {
-	query := `UPDATE users SET refresh_token = $1 WHERE id = #2;`
+	query := `UPDATE users SET refresh_token = $1 WHERE id = $2;`
 
 	_, err := r.db.Exec(ctx, query, refreshToken, userID)
 	if err != nil {
@@ -50,3 +50,26 @@ func (r *PostgresRepository) UpdateRefreshToken(
 	return nil
 }
 
+
+func (r *PostgresRepository) FindByRefreshToken(ctx context.Context, token string) (*User, error) {
+	query := `SELECT id, email, name, provider, provider_id, refresh_token FROM users WHERE refresh_token = $1;`
+
+	var u User
+	err := r.db.QueryRow(ctx, query, token).Scan(&u.ID, &u.Email, &u.Name, &u.Provider, &u.ProviderID, &u.RefreshToken)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find user by refresh token: %w", err)
+	}
+
+	return &u, nil
+}
+
+func (r *PostgresRepository) ClearRefreshToken(ctx context.Context, userID int) error {
+	query := `UPDATE users SET refresh_token = NULL WHERE id = $1;`
+
+	_, err := r.db.Exec(ctx, query, userID)
+	if err != nil {
+		return fmt.Errorf("failed to clear refresh token for user %d: %w", userID, err)
+	}
+	
+	return nil
+}

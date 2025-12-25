@@ -6,4 +6,5 @@ type User struct {
 	Name       string
 	Provider   string
 	ProviderID string
+	RefreshToken string
 }

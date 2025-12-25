@@ -4,14 +4,15 @@ import (
 	"context"
 	"net/http"
 	"time"
+
 )
 
 type Server struct {
 	httpServer *http.Server
 }
 
-// constructor
-func New(add string, handler http.Handler) *Server {
+//New constructor
+func New(addr string, handler http.Handler) *Server {
 	return &Server{
 		httpServer: &http.Server{
 			Addr:         addr,

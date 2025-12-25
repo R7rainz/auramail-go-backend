@@ -86,6 +86,35 @@ func ValidateAccessToken(token string) (*AccessTokenClaims, error) {
 	return claims, nil
 }
 
+func ValidateRefreshToken(token string) (*RefreshTokenClaims, error) {
+	key, err := jwtSecret()
+	if err != nil {
+		return nil, err 
+	}
+
+	parsedToken, err := jwt.ParseWithClaims(
+		token,
+		&RefreshTokenClaims{},
+		func(t *jwt.Token) (interface{}, error) {
+			if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
+			}
+			return key, nil
+		},
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("invalid refresh token: %w", err)
+	}
+
+	claims, ok := parsedToken.Claims.(*RefreshTokenClaims)
+	if !ok || !parsedToken.Valid {
+		return nil, errors.New("invalid refresh token claims")
+	}
+
+	return claims, nil
+}
+
 func GenerateRefreshToken(userID int, email string) (string, error) {
 	expirationTime := time.Now().Add(14 * 24 * time.Hour)
 	claims := &RefreshTokenClaims{
