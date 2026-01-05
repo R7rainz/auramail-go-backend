@@ -1,6 +1,8 @@
 package user
 
-import "context"
+import (
+	"context"
+)
 
 type Repository interface {
 	FindOrCreateGoogleUser(
@@ -19,4 +21,8 @@ type Repository interface {
 	FindByRefreshToken(ctx context.Context, token string) (*User, error)
 	
 	ClearRefreshToken(ctx context.Context, userID int) error
+
+	FindByID(ctx context.Context, id string) (*User, error)
+
+	Save(ctx context.Context, user *User) error
 }
