@@ -11,6 +11,16 @@ type PostgresRepository struct {
 	db *pgxpool.Pool
 }
 
+// FindByID implements [Repository].
+func (r *PostgresRepository) FindByID(ctx context.Context, id string) (*User, error) {
+	panic("unimplemented")
+}
+
+// Save implements [Repository].
+func (r *PostgresRepository) Save(ctx context.Context, user *User) error {
+	panic("unimplemented")
+}
+
 func NewPostgresRepository(db *pgxpool.Pool) *PostgresRepository {
 	return &PostgresRepository{db: db}
 }
@@ -22,7 +32,6 @@ func (r *PostgresRepository) FindOrCreateGoogleUser(
 	googleSub string,
 ) (*User, error) {
 
-	//TODO: write sql + scan here
 	query := `INSERT INTO users (email, name, provider, provider_id) VALUES ($1, $2, 'google', $3) ON CONFLICT (email) DO UPDATE SET name = EXCLUDED.name RETURNING id, email, name, provider, provider_id;`
 
 	var u User
@@ -36,8 +45,8 @@ func (r *PostgresRepository) FindOrCreateGoogleUser(
 }
 
 func (r *PostgresRepository) UpdateRefreshToken(
-	ctx context.Context, 
-	userID int, 
+	ctx context.Context,
+	userID int,
 	refreshToken string,
 ) error {
 	query := `UPDATE users SET refresh_token = $1 WHERE id = $2;`
@@ -49,7 +58,6 @@ func (r *PostgresRepository) UpdateRefreshToken(
 
 	return nil
 }
-
 
 func (r *PostgresRepository) FindByRefreshToken(ctx context.Context, token string) (*User, error) {
 	query := `SELECT id, email, name, provider, provider_id, refresh_token FROM users WHERE refresh_token = $1;`
@@ -64,12 +72,11 @@ func (r *PostgresRepository) FindByRefreshToken(ctx context.Context, token strin
 }
 
 func (r *PostgresRepository) ClearRefreshToken(ctx context.Context, userID int) error {
-	query := `UPDATE users SET refresh_token = NULL WHERE id = $1;`
-
+    query := `UPDATE users SET refresh_token = NULL WHERE id = $1;`
 	_, err := r.db.Exec(ctx, query, userID)
 	if err != nil {
 		return fmt.Errorf("failed to clear refresh token for user %d: %w", userID, err)
 	}
-	
+
 	return nil
 }
