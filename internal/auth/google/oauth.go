@@ -1,11 +1,14 @@
 package google
 
 import (
+	"context"
 	"fmt"
 	"os"
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
+	"google.golang.org/api/gmail/v1"
+	"google.golang.org/api/option"
 )
 
 func NewOAuthConfig() *oauth2.Config {
@@ -26,4 +29,19 @@ func NewOAuthConfig() *oauth2.Config {
 		},
 		Endpoint: google.Endpoint,
 	}
+}
+
+func CreateGmailService(ctx context.Context, refreshToken string) (*gmail.Service, error) {
+	config := NewOAuthConfig()
+
+	//Create token from stored refresh token
+	token := &oauth2.Token{
+		RefreshToken: refreshToken,
+		TokenType:    "Bearer",
+	}
+
+	tokenSource := config.TokenSource(ctx, token)
+	httpClient := oauth2.NewClient(ctx, tokenSource)
+
+	return gmail.NewService(ctx, option.WithHTTPClient(httpClient))
 }
