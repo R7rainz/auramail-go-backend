@@ -135,7 +135,7 @@ func GenerateRefreshToken(userID int, email string) (string, error) {
 
 	tokenString, err := token.SignedString(key)
 	if err != nil {
-		return "", fmt.Errorf("could not sign ", err)
+		return "", fmt.Errorf("coult not sign the token %w", err)
 	}
 	return tokenString, nil
 }
