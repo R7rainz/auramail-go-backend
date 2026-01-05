@@ -8,3 +8,4 @@ type User struct {
 	ProviderID string
 	RefreshToken string
 }
+
