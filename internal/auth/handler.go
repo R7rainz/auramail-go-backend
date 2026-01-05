@@ -10,7 +10,7 @@ import (
 
 type Handler struct {
 	oauthConfig *oauth2.Config
-	userRepo     user.Repository
+	userRepo    user.Repository
 	service     *Service
 }
 
@@ -19,22 +19,21 @@ type refreshRequest struct {
 }
 
 func NewHandler(cfg *oauth2.Config, userRepo user.Repository) *Handler {
-	return &Handler {
-		oauthConfig: cfg, 
-		userRepo: userRepo,
-		service: NewService(userRepo),
+	return &Handler{
+		oauthConfig: cfg,
+		userRepo:    userRepo,
+		service:     NewService(userRepo),
 	}
 }
 
 func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
-
 	var req refreshRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, "invalid request", http.StatusBadRequest)
 		return
 	}
 
-	_, err  := ValidateRefreshToken(req.RefreshToken)
+	_, err := ValidateRefreshToken(req.RefreshToken)
 	if err != nil {
 		http.Error(w, "invalid refresh token", http.StatusUnauthorized)
 		return
@@ -54,7 +53,7 @@ func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Context-Type", "application/json")
-	if err:= json.NewEncoder(w).Encode(map[string]string{
+	if err := json.NewEncoder(w).Encode(map[string]string{
 		"access_token": accessToken,
 	}); err != nil {
 		http.Error(w, "failed to write response", http.StatusInternalServerError)
@@ -76,17 +75,3 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-// func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
-// 	userID, ok := r.Context().Value("userID").(int)
-// 	if !ok {
-// 		http.Error(w, "unauthorized", http.StatusUnauthorized)
-// 		return
-// 	}
-//
-// 	if err := h.service.Logout(r.Context(), userID); err != nil {
-// 		http.Error(w, "logout failed", http.StatusInternalServerError)
-// 		return
-// 	}
-//
-// 	w.WriteHeader(http.StatusOK)
-// }
