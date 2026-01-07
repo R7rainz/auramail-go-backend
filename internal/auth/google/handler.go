@@ -32,6 +32,7 @@ func (h *Handler) GoogleAuth(w http.ResponseWriter, r *http.Request) {
 	authURL := h.oauthConfig.AuthCodeURL(
 		state,
 		oauth2.AccessTypeOffline,
+		oauth2.ApprovalForce,
 	)
 	http.Redirect(w, r, authURL, http.StatusTemporaryRedirect)
 }
@@ -91,33 +92,41 @@ func (h *Handler) GoogleCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	accessToken, err := auth.GenerateAccessToken(
-		u.ID,
-		u.Email,
-		u.Name,
-	)
 
 	if err != nil {
 		http.Error(w, "failed to generate token", http.StatusInternalServerError)
 		return
 	}
 
-	refreshToken, err := auth.GenerateRefreshToken(u.ID, u.Email)
+	if token.RefreshToken != "" {
+		//save the google token to db
+		if err := h.userRepo.UpdateRefreshToken(ctx, u.ID, token.RefreshToken); err != nil {
+			log.Fatalf("failed to save google refresh token: %v", err)
+		}
+	}else{
+		log.Printf("no google refresh token received, using existing one")
+	}
+
+	accessToken, err := auth.GenerateAccessToken(
+		u.ID,
+		u.Email,
+		u.Name,
+	)
+	if err != nil {
+		http.Error(w, "failed to generate access token", http.StatusInternalServerError)
+		return
+	}
+
+	appRefreshToken, err := auth.GenerateRefreshToken(u.ID, u.Email) 
 	if err != nil {
 		http.Error(w, "failed to generate refresh token", http.StatusInternalServerError)
 		return
 	}
 
-	if err := h.userRepo.UpdateRefreshToken(ctx, u.ID, refreshToken); err != nil {
-		http.Error(w, "failed to persist refresh token", http.StatusInternalServerError)
-		return
-	}
-
-
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{
 		"accessToken": accessToken,
-		"refreshToken" : refreshToken,
+		"refreshToken" : appRefreshToken,
 	})
 }
 
