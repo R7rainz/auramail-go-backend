@@ -1,0 +1,40 @@
+AuraMail Backend
+
+Overview
+- Google OAuth login, JWT auth (access + refresh)
+- Gmail read-only fetch for placement emails
+- Optional AI summaries via OpenAI
+- Simple HTTP server with CORS, SSE streaming
+
+Quick Start
+1) Prerequisites: Go 1.21+, PostgreSQL, (optional) Docker, OpenAI key
+2) Install deps:
+   go mod download && go mod tidy
+3) Configure .env in project root:
+   DATABASE_URL=postgresql://postgres:postgres@localhost:5432/auramail
+   GOOSE_DBSTRING=postgresql://postgres:postgres@localhost:5432/auramail
+   JWT_SECRET=change-me
+   GOOGLE_OAUTH_CLIENT_ID=your-client-id
+   GOOGLE_OAUTH_CLIENT_SECRET=your-client-secret
+   GOOGLE_OAUTH_REDIRECT_URI=http://localhost:8080/auth/google/callback
+   OPENAI_API_KEY=your-openai-key   # optional, enables AI summaries
+4) Build & run:
+   go build -o backend ./cmd/backend
+   ./backend
+
+Key Endpoints
+- GET  /health
+- GET  /auth/google
+- GET  /auth/google/callback
+- POST /auth/refresh
+- POST /auth/logout   (Bearer token required)
+- GET  /emails/sync   (Bearer token required)
+- GET  /emails/stream (Bearer token required, SSE)
+
+Docs
+- See doc/README.md for full documentation, setup, and guides.
+
+Notes
+- Set proper OAuth redirect URI in Google Cloud Console.
+- Provide JWT_SECRET in production and use HTTPS.
+- OPENAI_API_KEY enables AI summaries; without it, streaming returns minimal content.
