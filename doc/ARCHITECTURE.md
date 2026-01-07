@@ -9,12 +9,15 @@ The AuraMail backend follows a **layered architecture pattern** with clear separ
 │         HTTP Layer (Handlers)               │
 │    - GoogleHandler                          │
 │    - AuthHandler                            │
+│    - GmailHandler                           │
+│    - SSE Stream (emails/stream)             │
 └──────────────────┬──────────────────────────┘
                    │
 ┌──────────────────▼──────────────────────────┐
-│      Business Logic Layer (Service)         │
-│    - Service.Refresh()                      │
-│    - Service.Logout()                       │
+│      Business Logic Layer (Services)        │
+│    - Auth.Service.Refresh()                 │
+│    - Auth.Service.Logout()                  │
+│    - Gmail.FetchAndSummarize()              │
 └──────────────────┬──────────────────────────┘
                    │
 ┌──────────────────▼──────────────────────────┐
@@ -26,6 +29,13 @@ The AuraMail backend follows a **layered architecture pattern** with clear separ
 ┌──────────────────▼──────────────────────────┐
 │      Database Layer (PostgreSQL)            │
 │    - users table                            │
+└──────────────────┬──────────────────────────┘
+                   │
+┌──────────────────▼──────────────────────────┐
+│           External Services                 │
+│    - Google OAuth 2.0                       │
+│    - Gmail API (readonly)                   │
+│    - OpenAI API (summaries)                 │
 └─────────────────────────────────────────────┘
 ```
 
@@ -40,7 +50,7 @@ type User struct {
     ID            int       // Unique identifier
     Email         string    // User's email
     Name          string    // User's full name
-    Provider      string    // OAuth provider (e.g., "google")
+   Provider      string    // OAuth provider (e.g., "google") (may be empty)
     ProviderID    string    // Provider's unique ID for user
     RefreshToken  string    // JWT refresh token
 }
@@ -54,6 +64,8 @@ type Repository interface {
     UpdateRefreshToken(ctx, userID, token) error
     FindByRefreshToken(ctx, token) (*User, error)
     ClearRefreshToken(ctx, userID) error
+   FindByID(ctx, id string) (*User, error)
+   Save(ctx context.Context, user *User) error
 }
 ```
 
@@ -67,10 +79,12 @@ type Repository interface {
 
 Implements the `Repository` interface with actual SQL queries:
 
-- `FindOrCreateGoogleUser` - Upsert user on Google login
+- `FindOrCreateGoogleUser` - Insert-once by email (stores `provider_id`)
 - `UpdateRefreshToken` - Save refresh token to database
 - `FindByRefreshToken` - Retrieve user by their refresh token
 - `ClearRefreshToken` - Delete refresh token (logout)
+- `FindByID` - Fetch user by numeric ID (with cast)
+- `Save` - Update basic user fields
 
 ---
 
@@ -177,6 +191,34 @@ type Handler struct {
 
 ---
 
+### 3. Gmail Layer (`internal/gmail/`)
+
+- `handler.go` exposes:
+
+  - `GET /emails/sync` (protected): returns recent placement-related emails parsed into a compact structure
+  - `GET /emails/stream` (protected, SSE): streams AI summaries with heartbeat support
+
+- `service.go` provides `FetchAndSummarize(ctx, srv, query, userID)`
+
+  - Fetches message metadata from Gmail
+  - Extracts subject/body (via `internal/utils/gmail.go`)
+  - Calls `ai.AnalyzeEmail()` concurrently with a worker pool
+  - Emits validated summaries on a channel
+
+- `internal/utils/gmail.go` includes:
+  - `ListPlacementEmails()` — concurrent fetch of messages
+  - `ParseBody()` — retrieves and cleans message body
+  - `FormatForAI()` and helpers
+
+### 4. AI Layer (`internal/ai/`)
+
+- `summarizer.go`:
+  - Uses `go-openai` (`OPENAI_API_KEY` required) with `GPT4oMini`
+  - Caches results (in-memory TTL)
+  - Returns a structured `AIResult` JSON (fields are nullable where appropriate)
+
+---
+
 ### 3. Google OAuth Layer (`internal/auth/google/`)
 
 #### OAuth Configuration (`oauth.go`)
@@ -256,7 +298,7 @@ User                    Backend              Google
    → Fetch user info from Google
    → FindOrCreateGoogleUser() in DB
    → Generate JWT access + refresh tokens
-   → Return tokens to client
+   → Return tokens to client (camelCase keys)
 
 4. Client stores tokens (access in memory, refresh securely)
 ```
@@ -298,7 +340,7 @@ User                    Backend              Google
 | Principle        | Implementation                                 |
 | ---------------- | ---------------------------------------------- |
 | Token Separation | Access token (short) + Refresh token (long)    |
-| Secure Storage   | Refresh token only stored in database (hashed) |
+| Secure Storage   | Refresh token stored in database (server-side) |
 | Token Validation | Signature verification + expiration check      |
 | Context Binding  | User info extracted from JWT claims            |
 | Stateless Auth   | No session storage, only validate JWTs         |
@@ -316,4 +358,4 @@ User                    Backend              Google
 
 ---
 
-_Last Updated: December 26, 2025_
+_Last Updated: January 7, 2026_

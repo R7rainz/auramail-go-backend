@@ -12,14 +12,14 @@ AuraMail uses **PostgreSQL** as the primary data store. This document describes 
 
 ```sql
 CREATE TABLE users (
-    id SERIAL PRIMARY KEY,
-    email VARCHAR(255) NOT NULL UNIQUE,
-    name VARCHAR(255),
-    provider VARCHAR(50) NOT NULL,      -- e.g., "google"
-    provider_id VARCHAR(255) NOT NULL,  -- e.g., Google sub
-    refresh_token TEXT,                 -- JWT refresh token
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        id SERIAL PRIMARY KEY,
+        email VARCHAR(255) NOT NULL UNIQUE,
+        name VARCHAR(255),
+        provider VARCHAR(50),               -- e.g., "google" (nullable in current code path)
+        provider_id VARCHAR(255) NOT NULL,  -- e.g., Google sub
+        refresh_token TEXT,                 -- App refresh token (JWT)
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 ```
 
@@ -30,7 +30,7 @@ CREATE TABLE users (
 | `id`            | SERIAL       | PRIMARY KEY      | Unique user identifier          |
 | `email`         | VARCHAR(255) | NOT NULL, UNIQUE | User's email (unique per user)  |
 | `name`          | VARCHAR(255) | -                | User's full name                |
-| `provider`      | VARCHAR(50)  | NOT NULL         | OAuth provider ("google")       |
+| `provider`      | VARCHAR(50)  | (nullable)       | OAuth provider ("google")       |
 | `provider_id`   | VARCHAR(255) | NOT NULL         | Provider's unique ID for user   |
 | `refresh_token` | TEXT         | -                | JWT refresh token (can be NULL) |
 | `created_at`    | TIMESTAMP    | DEFAULT NOW()    | Account creation time           |
@@ -49,12 +49,12 @@ Check if email exists in database
         ↓
 Email NOT found
         ↓
-INSERT INTO users (email, name, provider, provider_id)
-VALUES ('user@gmail.com', 'John Doe', 'google', '118439...')
+INSERT INTO users (email, name, provider_id)
+VALUES ('user@gmail.com', 'John Doe', '118439...')
         ↓
 User record created
         ↓
-Generate refresh token
+Generate app refresh token
         ↓
 UPDATE users SET refresh_token = '...' WHERE id = 1
         ↓

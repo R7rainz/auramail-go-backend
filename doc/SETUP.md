@@ -86,6 +86,7 @@ JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
 GOOGLE_OAUTH_CLIENT_ID=your-client-id.apps.googleusercontent.com
 GOOGLE_OAUTH_CLIENT_SECRET=your-client-secret
 GOOGLE_OAUTH_REDIRECT_URI=http://localhost:8080/auth/google/callback
+OPENAI_API_KEY=your-openai-key   # optional but required for AI summaries/SSE
 
 # Server
 SERVER_PORT=8080
@@ -136,10 +137,23 @@ Expected output:
 
 ### Verify Server is Running
 
-```bash
+````bash
 curl http://localhost:8080/health
 # Response: ok
-```
+
+### Test Email Endpoints (after logging in & obtaining tokens)
+
+```bash
+# Sync recent placement emails
+curl -H "Authorization: Bearer $ACCESS_TOKEN" \
+  http://localhost:8080/emails/sync | jq .
+
+# Stream AI summaries over SSE
+curl -N -H "Authorization: Bearer $ACCESS_TOKEN" \
+  http://localhost:8080/emails/stream
+````
+
+````
 
 ---
 
@@ -151,7 +165,7 @@ Install `air` for hot-reload:
 
 ```bash
 go install github.com/cosmtrek/air@latest
-```
+````
 
 Create `.air.toml` in project root:
 
@@ -285,6 +299,13 @@ curl -X POST http://localhost:8080/auth/refresh \
 
 # Logout (requires valid access token)
 curl -X POST http://localhost:8080/auth/logout \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+
+# Emails (requires valid access token)
+curl http://localhost:8080/emails/sync \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+
+curl -N http://localhost:8080/emails/stream \
   -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
 ```
 

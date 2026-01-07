@@ -24,14 +24,15 @@ This guide walks you through setting up Google OAuth 2.0 credentials for the Aur
 4. Click **Create**
 5. Wait for project creation (may take a minute)
 
-### Step 2: Enable Google+ API
+### Step 2: Enable Required APIs
 
 1. In the Cloud Console, go to **APIs & Services** → **Library**
-2. Search for `Google+ API`
-3. Click on **Google+ API**
-4. Click **Enable**
+2. Enable the following:
 
-**Alternative:** Search for `OAuth 2.0 API` or just `Google API`
+- Gmail API
+- Google OAuth 2.0 endpoints (Identity Services)
+
+**Tip:** Search for "Gmail" and "Identity".
 
 ### Step 3: Create OAuth 2.0 Credentials
 
@@ -90,6 +91,7 @@ Update your `.env` file:
 GOOGLE_OAUTH_CLIENT_ID=YOUR_CLIENT_ID.apps.googleusercontent.com
 GOOGLE_OAUTH_CLIENT_SECRET=YOUR_CLIENT_SECRET
 GOOGLE_OAUTH_REDIRECT_URI=http://localhost:8080/auth/google/callback
+OPENAI_API_KEY=your-openai-key   # optional but required for AI summaries
 ```
 
 **⚠️ Never commit credentials to version control!**
@@ -125,15 +127,8 @@ Check that you receive:
 
 ```json
 {
-  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "user": {
-    "id": 1,
-    "email": "user@gmail.com",
-    "name": "John Doe",
-    "provider": "google",
-    "provider_id": "118439..."
-  }
+  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 }
 ```
 
@@ -351,4 +346,4 @@ curl -X POST https://oauth2.googleapis.com/token \
 
 ---
 
-_Last Updated: December 26, 2025_
+_Last Updated: January 7, 2026_

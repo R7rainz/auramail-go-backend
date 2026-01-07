@@ -12,7 +12,9 @@ All endpoints are prefixed with the base URL: `http://localhost:8080`
 | `GET`       | `/auth/google`          | Initiate Google login | ❌ No                      |
 | `GET`       | `/auth/google/callback` | Google OAuth callback | ❌ No                      |
 | `POST`      | `/auth/refresh`         | Refresh access token  | ❌ No (uses refresh token) |
-| `POST`      | `/auth/logout`          | Logout user           | ✅ Yes (context)           |
+| `POST`      | `/auth/logout`          | Logout user           | ✅ Yes (Bearer)            |
+| `GET`       | `/emails/sync`          | Fetch recent emails   | ✅ Yes (Bearer)            |
+| `GET`       | `/emails/stream`        | Stream AI summaries   | ✅ Yes (Bearer)            |
 
 ---
 
@@ -91,15 +93,8 @@ Status: 200 OK
 Content-Type: application/json
 
 {
-  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "user": {
-    "id": 1,
-    "email": "user@gmail.com",
-    "name": "John Doe",
-    "provider": "google",
-    "provider_id": "118439..."
-  }
+  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 }
 ```
 
@@ -197,7 +192,7 @@ curl -X POST http://localhost:8080/auth/logout \
 
 **Request Headers:**
 
-- `Authorization: Bearer {access_token}` (must be set by middleware)
+- `Authorization: Bearer {access_token}`
 
 **Response (Success):**
 
@@ -216,7 +211,7 @@ Body: unauthorized
 
 ```
 Status: 500 Internal Server Error
-Body: failed to logout
+Body: logout failed
 ```
 
 **Notes:**
@@ -298,8 +293,8 @@ GET http://localhost:8080/auth/google/callback?code=4/0A...&state=...
 
 # Response: 200 OK
 # {
-#   "access_token": "eyJhbGc...",
-#   "refresh_token": "eyJhbGc..."
+#   "accessToken": "eyJhbGc...",
+#   "refreshToken": "eyJhbGc..."
 # }
 ```
 
@@ -314,7 +309,7 @@ Client stores:
 
 ```bash
 # Make API requests with access token
-GET http://api.auramail.com/emails \
+GET http://localhost:8080/emails/sync \
   -H "Authorization: Bearer {access_token}"
 ```
 
@@ -386,6 +381,85 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
 
 The middleware extracts the token and validates it, placing the userID in the request context.
+
+---
+
+## ✉️ Email Endpoints
+
+### 1) `GET /emails/sync`
+
+Fetches recent placement-related emails (read-only) for the authenticated user and returns a parsed list.
+
+Request:
+
+```bash
+curl -X GET http://localhost:8080/emails/sync \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+```
+
+Response (200):
+
+```json
+[
+  {
+    "id": "187ab...",
+    "subject": "Placement Drive: ACME",
+    "from": "placementoffice@vitbhopal.ac.in",
+    "date": "Mon, 06 Jan 2026 10:15:00 +0530",
+    "body": "...cleaned plain text...",
+    "snippet": "Short Gmail snippet..."
+  }
+]
+```
+
+Errors:
+
+- 401 Unauthorized: missing/invalid token
+- 404 User not found
+- 500 Failed to connect to Gmail / Extraction Failed
+
+Notes:
+
+- Uses Gmail scope `gmail.readonly`
+- Query currently filters placement emails
+
+### 2) `GET /emails/stream` (SSE)
+
+Streams AI summaries for recent placement emails using Server-Sent Events. Keeps the connection open and periodically sends data or heartbeats.
+
+Request:
+
+```bash
+curl -N -H "Accept: text/event-stream" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
+  http://localhost:8080/emails/stream
+```
+
+Response events:
+
+```
+data: {"summary":"...","category":"...","company":null,...}
+:
+data: {"summary":"..."}
+```
+
+Error event when no emails found:
+
+```
+data: {"error": "no_emails_found"}
+```
+
+Headers:
+
+- `Content-Type: text/event-stream`
+- `Cache-Control: no-cache`
+- `Connection: keep-alive`
+- CORS is enabled for development
+
+Notes:
+
+- Heartbeat comment `: heartbeat` is sent every 15s to keep the connection alive
+- Requires environment variable `OPENAI_API_KEY` for AI summaries; if not set, summaries are minimal
 
 ---
 

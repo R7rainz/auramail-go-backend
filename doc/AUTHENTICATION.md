@@ -70,11 +70,10 @@ AuraMail uses a two-tier token system for secure, stateless authentication:
 ┌──────────────────────────────────┐
 │ Return to Client:                │
 │ {                                │
-│   "access_token": "...",         │
-│   "refresh_token": "...",        │
-│   "user": {...}                  │
+│   "accessToken": "...",          │
+│   "refreshToken": "..."          │
 │ }                                │
-└────────────────────────────────┤
+└──────────────────────────────────┘
            │
            │ 7. Store tokens
            ▼
@@ -119,7 +118,7 @@ AuraMail uses a two-tier token system for secure, stateless authentication:
    - Backend checks if user exists
    - If exists: update user data
    - If new: create user record
-   - Store refresh token hash in database
+   - Store Google refresh token if provided (for Gmail API)
 
 8. **Generate JWTs**
 
@@ -127,7 +126,7 @@ AuraMail uses a two-tier token system for secure, stateless authentication:
    - `GenerateRefreshToken()` - creates long-lived token
 
 9. **Return to Client**
-   - Send both tokens to frontend
+   - Send both tokens (camelCase keys) to frontend
    - Frontend stores them securely
 
 ---
@@ -217,8 +216,8 @@ When access token expires (after 15 minutes):
       ▼
 ┌──────────────────────┐
 │ Middleware           │
-│ Extract & validate   │
-│ access token         │
+│ Validate JWT (Bearer │
+│ Authorization header)│
 └──────┬───────────────┘
        │
        │ 2. Extract userID from token
@@ -309,7 +308,7 @@ claims := &AccessTokenClaims{
 └─────────────────┘
 ```
 
-- Refresh token stored in database (in addition to client)
+- App refresh token stored in database (in addition to client)
 - During refresh, validate token exists in database
 - Logout clears token from database
 - Prevents use of old/stolen tokens (server-side revocation)
@@ -328,7 +327,7 @@ For production:
 State parameter in OAuth flow:
 
 ```go
-state := "random-state-for-now"  // In real code: generate random
+state := "random-state-for-now"  // TODO: generate cryptographically random value
 authURL := h.oauthConfig.AuthCodeURL(state)
 ```
 
@@ -488,4 +487,4 @@ async function makeAuthenticatedRequest(url) {
 
 ---
 
-_Last Updated: December 26, 2025_
+_Last Updated: January 7, 2026_

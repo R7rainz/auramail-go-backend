@@ -8,10 +8,11 @@ AuraMail is an email management backend service that integrates with Google OAut
 
 - **Google OAuth 2.0 Integration** - Seamless login with Google accounts
 - **JWT Token Management** - Secure access and refresh tokens
-- **Email Access** - Permission to read Gmail data
+- **Gmail Integration** - Read-only access to Gmail placement emails
 - **User Management** - Automatic user creation and management
 - **Token Refresh** - Ability to refresh expired access tokens
 - **Logout** - Secure token invalidation
+- **AI Summaries (Optional)** - Summarize emails via OpenAI if `OPENAI_API_KEY` is set
 
 ## 🏗️ Project Structure
 
@@ -48,6 +49,8 @@ go-backendfor-auramail/
 - **HTTP Framework**: Standard Go `net/http`
 - **Token Library**: `github.com/golang-jwt/jwt/v5`
 - **Database Driver**: `github.com/jackc/pgx/v5`
+- **Gmail API**: `google.golang.org/api/gmail/v1`
+- **OpenAI**: `github.com/sashabaranov/go-openai`
 
 ## 📚 Documentation Structure
 
@@ -80,6 +83,7 @@ JWT_SECRET=your-very-secret-jwt-key
 GOOGLE_OAUTH_CLIENT_ID=your-google-client-id
 GOOGLE_OAUTH_CLIENT_SECRET=your-google-client-secret
 GOOGLE_OAUTH_REDIRECT_URI=http://localhost:8080/auth/google/callback
+OPENAI_API_KEY=your-openai-key   # optional but enables AI summaries & streaming
 ```
 
 ### Running the Server
@@ -103,6 +107,8 @@ The server will start on `http://localhost:8080`
 | `GET`  | `/auth/google/callback` | Google OAuth callback               |
 | `POST` | `/auth/refresh`         | Refresh access token                |
 | `POST` | `/auth/logout`          | Logout and invalidate refresh token |
+| `GET`  | `/emails/sync`          | Fetch recent placement emails       |
+| `GET`  | `/emails/stream`        | Stream AI summaries (SSE)           |
 
 ## 💡 Core Concepts
 
@@ -129,4 +135,4 @@ The server will start on `http://localhost:8080`
 
 ---
 
-_Last Updated: December 26, 2025_
+_Last Updated: January 7, 2026_
