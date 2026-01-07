@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/r7rainz/auramail/internal/auth"
 	"github.com/r7rainz/auramail/internal/auth/google"
 	"github.com/r7rainz/auramail/internal/user"
 	"github.com/r7rainz/auramail/internal/utils"
@@ -23,7 +24,7 @@ func NewHandler(repo user.Repository) *GmailHandler {
 func (h *GmailHandler) SyncPlacementEmails(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	userID, ok := ctx.Value("userID").(string)
+	userID, ok := ctx.Value(auth.UserIDContextKey).(string)
 	if !ok {
 		http.Error(w, "Unauthorized: No UserID found", http.StatusUnauthorized)
 	}
@@ -36,7 +37,8 @@ func (h *GmailHandler) SyncPlacementEmails(w http.ResponseWriter, r *http.Reques
 
 	srv, err := google.CreateGmailService(ctx, u.RefreshToken)
 	if err != nil {
-		http.Error(w, "Failed to connect to Gmail", http.StatusInternalServerError)
+		log.Printf("Gmail Service Error: %v", err)
+		http.Error(w, "Failed to connect to Gmail", 500)
 		return
 	}
 
@@ -61,12 +63,12 @@ func (h *GmailHandler) StreamPlacementEmails(w http.ResponseWriter, r *http.Requ
 
 	ctx := r.Context()
 
-	userID, ok := ctx.Value("userID").(string)
-	if !ok {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-		return
+	rawID := ctx.Value(auth.UserIDContextKey)
+	if rawID == nil {
+		http.Error(w, "Unauthorized: No UserID", http.StatusUnauthorized)
 	}
 
+	userID := fmt.Sprintf("%v", rawID)
 	u, err := h.userRepo.FindByID(ctx, userID)
 	if err != nil {
 		http.Error(w, "User not found", http.StatusNotFound)
@@ -80,7 +82,7 @@ func (h *GmailHandler) StreamPlacementEmails(w http.ResponseWriter, r *http.Requ
 	}
 
 	query := "from:placementoffice@vitbhopal.ac.in"
-	emailStream := FetchAndSummarize(ctx, srv, query)
+	emailStream := FetchAndSummarize(ctx, srv, query, u.ID)
 
 	foundAny := false
 
