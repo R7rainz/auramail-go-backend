@@ -14,7 +14,6 @@ import (
 
 	"github.com/r7rainz/auramail/internal/auth"
 	"github.com/r7rainz/auramail/internal/gmail"
-	"github.com/r7rainz/auramail/internal/server"
 	"github.com/r7rainz/auramail/internal/user"
 
 	authgoogle "github.com/r7rainz/auramail/internal/auth/google"
@@ -82,11 +81,17 @@ func main() {
 	mux.Handle("GET /emails/stream", auth.AuthMiddleware((http.HandlerFunc(gmailHandler.StreamPlacementEmails))))
 
 	handlerWithCORS := corsMiddleware(mux)
-	srv := server.New(":8080", handlerWithCORS)
+	srv  := &http.Server{
+		Addr : ":8080", 
+		Handler : handlerWithCORS,
+		ReadTimeout: 5 * time.Minute,
+		WriteTimeout: 5 * time.Minute,
+		IdleTimeout: 5 * time.Minute,
+	}
 
 	go func() {
 		log.Printf("Server starting on :8080")
-		if err := srv.Start(); err != nil && err != http.ErrServerClosed {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Server error: %v", err)
 		}
 	}()
