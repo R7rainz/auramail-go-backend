@@ -4,8 +4,9 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/r7rainz/auramail/internal/user"
 	"golang.org/x/oauth2"
+
+	"github.com/r7rainz/auramail/internal/user"
 )
 
 type Handler struct {
