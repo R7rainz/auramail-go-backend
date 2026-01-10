@@ -8,10 +8,11 @@ import (
 	"google.golang.org/api/gmail/v1"
 
 	"github.com/r7rainz/auramail/internal/ai"
+	"github.com/r7rainz/auramail/internal/user"
 	"github.com/r7rainz/auramail/internal/utils"
 )
 
-func FetchAndSummarize(ctx context.Context, srv *gmail.Service, query string, userID int) chan *ai.AIResult {
+func FetchAndSummarize(ctx context.Context, srv *gmail.Service,repo *user.PostgresRepository, query string, userID int) chan *ai.AIResult {
 	out := make(chan *ai.AIResult)
 
 	go func() {
@@ -34,6 +35,15 @@ func FetchAndSummarize(ctx context.Context, srv *gmail.Service, query string, us
 			go func() {
 				defer wg.Done()
 				for id := range jobs {
+					//checking db first
+					cached, err := repo.GetSummary(ctx, id)
+					if err == nil && cached != nil {
+						select{
+						case <-ctx.Done(): return
+					case out <-cached: continue
+						}
+					}
+
 					msg, err := srv.Users.Messages.Get("me", id).Format("full").Do()
 					if err != nil {
 						continue
@@ -53,6 +63,11 @@ func FetchAndSummarize(ctx context.Context, srv *gmail.Service, query string, us
 					if err != nil || summary == nil {
 						log.Printf("Skipping empty summary for %s: %v", id, err)
 						continue
+					}
+
+					err = repo.SaveSummary(ctx, userID, id, summary)
+					if err != nil{
+						log.Printf("Error saving summary to DB: %v", err)
 					}
 					
 					// Only send if we have a valid result
