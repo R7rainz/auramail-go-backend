@@ -42,7 +42,7 @@ var (
 	once    sync.Once
 )
 
-const CACHE_TTL = 1 * time.Hour
+const CacheTTL = 1 * time.Hour
 
 func getClient() *openai.Client {
 	once.Do(func() {
@@ -63,7 +63,7 @@ func AnalyzeEmail(ctx context.Context,userID int, subject, snippet, body string)
 	cacheMu.RLock()
 	cached, exists := aiCache[cacheKey]
 	cacheMu.RUnlock()
-	if exists && time.Since(cached.timestamp) < CACHE_TTL {
+	if exists && time.Since(cached.timestamp) < CacheTTL {
 		return cached.data, nil
 	}
 
