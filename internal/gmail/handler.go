@@ -14,11 +14,13 @@ import (
 )
 
 type GmailHandler struct {
-    userRepo user.Repository
+    userRepo *user.PostgresRepository
 }
 
-func NewHandler(repo user.Repository) *GmailHandler {
-    return &GmailHandler{userRepo: repo}
+func NewHandler(repo *user.PostgresRepository) *GmailHandler {
+	return &GmailHandler {
+		userRepo: repo,
+	}
 }
 
 func (h *GmailHandler) SyncPlacementEmails(w http.ResponseWriter, r *http.Request) {
@@ -81,8 +83,11 @@ func (h *GmailHandler) StreamPlacementEmails(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	query := "from:placementoffice@vitbhopal.ac.in"
-	emailStream := FetchAndSummarize(ctx, srv, query, u.ID)
+	query := r.URL.Query().Get("query")
+	if query == "" {
+		query = "from:placementoffice@vitbhopal.ac.in"
+	}
+	emailStream := FetchAndSummarize(ctx, srv, h.userRepo, query, u.ID)
 
 	foundAny := false
 
