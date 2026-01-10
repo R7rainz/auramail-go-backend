@@ -2,10 +2,13 @@ package user
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/r7rainz/auramail/internal/ai"
 )
 
 type PostgresRepository struct {
@@ -122,5 +125,50 @@ func (r *PostgresRepository) ClearRefreshToken(ctx context.Context, userID int) 
 		return fmt.Errorf("failed to clear refresh token for user %d: %w", userID, err)
 	}
 
+	return nil
+}
+
+func (r *PostgresRepository) GetSummary(ctx context.Context, gmailID string) (*ai.AIResult, error) {
+	var data []byte
+	query := `SELECT data FROM email_summaries WHERE gmail_id = $1`
+	
+	err := r.db.QueryRow(ctx, query, gmailID).Scan(&data)
+	if err != nil {
+		return nil, err
+	}
+
+	var result ai.AIResult
+	if err := json.Unmarshal(data, &result); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal cached summary: %w", err)
+	}
+
+	return &result, nil
+}
+
+func (r *PostgresRepository) SaveSummary(ctx context.Context, userID int, gmailID string, res *ai.AIResult) error {
+	jsonData, err := json.Marshal(res)
+	if err != nil {
+		return fmt.Errorf("failed to unmarshal AI result: %w", err)
+	}
+
+    query := `
+		INSERT INTO email_summaries (user_id, gmail_id, category, company, role, summary, deadline, apply_link, data)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		ON CONFLICT (gmail_id) DO NOTHING`
+        
+	_, err = r.db.Exec(ctx, query,
+		userID,
+		gmailID,
+		res.Category,
+		res.Company,
+		res.Role,
+		res.Summary,
+		res.Deadline,
+		res.ApplyLink,
+		jsonData,
+    )
+	if err != nil {
+		return fmt.Errorf("failed to save summary to db: %w", err)
+	}
 	return nil
 }
