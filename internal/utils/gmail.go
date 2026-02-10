@@ -33,7 +33,9 @@ func ListPlacementEmails(srv *gmail.Service, query string, maxResults int64) ([]
 	var wg sync.WaitGroup
 
 	for range 10 {
-		wg.Go(func() {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
 			for id := range jobs {
 				msg, err := srv.Users.Messages.Get("me", id).Format("full").Do()
 				if err != nil {
@@ -54,8 +56,8 @@ func ListPlacementEmails(srv *gmail.Service, query string, maxResults int64) ([]
 				email.Body = ParseBody(msg.Payload)
 				results <- email
 			}
-		} )
-	} 
+		}()
+	}
 
 	//Feeding the workers 
 	for _, m := range res.Messages {
@@ -64,10 +66,10 @@ func ListPlacementEmails(srv *gmail.Service, query string, maxResults int64) ([]
 	close(jobs) //no more ids to send
 
 	//wait and collect results
-	go func()  {
+	go func() {
 		wg.Wait()
 		close(results)
-	} ()
+	}()
 
 	var finalResult []*EmailMessage
 	for email := range results {
