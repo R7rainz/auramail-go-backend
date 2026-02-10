@@ -2,9 +2,11 @@ package google
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
+	"net/url"
 
 	"github.com/r7rainz/auramail/internal/auth"
 	"github.com/r7rainz/auramail/internal/user"
@@ -12,8 +14,10 @@ import (
 )
 
 type Handler struct {
-	oauthConfig *oauth2.Config
-	userRepo    user.Repository
+	oauthConfig  *oauth2.Config
+	userRepo     user.Repository
+	stateManager *StateManager
+	frontendURL  string
 }
 
 type GoogleUser struct {
@@ -22,12 +26,22 @@ type GoogleUser struct {
 	Name  string `json:"name"`
 }
 
-func NewHandler(cfg *oauth2.Config, userRepo user.Repository) *Handler {
-	return &Handler{oauthConfig: cfg, userRepo: userRepo}
+func NewHandler(cfg *oauth2.Config, userRepo user.Repository, frontendURL string) *Handler {
+	return &Handler{
+		oauthConfig:  cfg,
+		userRepo:     userRepo,
+		stateManager: NewStateManager(),
+		frontendURL:  frontendURL,
+	}
 }
 
 func (h *Handler) GoogleAuth(w http.ResponseWriter, r *http.Request) {
-	state := "random-state-for-now"
+	state, err := h.stateManager.Generate()
+	if err != nil {
+		slog.Error("failed to generate oauth state", "err", err)
+		http.Error(w, "failed to start oauth flow", http.StatusInternalServerError)
+		return
+	}
 
 	authURL := h.oauthConfig.AuthCodeURL(
 		state,
@@ -38,6 +52,12 @@ func (h *Handler) GoogleAuth(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GoogleCallback(w http.ResponseWriter, r *http.Request) {
+	state := r.URL.Query().Get("state")
+	if !h.stateManager.Validate(state) {
+		http.Error(w, "invalid state", http.StatusBadRequest)
+		return
+	}
+
 	codeStr := r.URL.Query().Get("code")
 	if codeStr == "" {
 		http.Error(w, "missing code", http.StatusBadRequest)
@@ -48,7 +68,7 @@ func (h *Handler) GoogleCallback(w http.ResponseWriter, r *http.Request) {
 
 	token, err := h.oauthConfig.Exchange(ctx, codeStr)
 	if err != nil {
-		log.Printf("exchange failed: %v", err)
+		slog.Error("oauth exchange failed", "err", err)
 		http.Error(w, "oauth exchange failed", http.StatusInternalServerError)
 		return
 	}
@@ -56,7 +76,7 @@ func (h *Handler) GoogleCallback(w http.ResponseWriter, r *http.Request) {
 	client := h.oauthConfig.Client(ctx, token)
 	resp, err := client.Get("https://www.googleapis.com/oauth2/v3/userinfo")
 	if err != nil {
-		log.Printf("userinfo request failed: %v", err)
+		slog.Error("userinfo request failed", "err", err)
 		http.Error(w, "failed to fetch user info", http.StatusInternalServerError)
 		return
 	}
@@ -79,7 +99,7 @@ func (h *Handler) GoogleCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("google user: %s (%s)", user.Email, user.Sub)
+	slog.Info("google user authenticated", "email", user.Email, "sub", user.Sub)
 
 	u, err := h.userRepo.FindOrCreateGoogleUser(
 		ctx,
@@ -92,7 +112,6 @@ func (h *Handler) GoogleCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-
 	if err != nil {
 		http.Error(w, "failed to generate token", http.StatusInternalServerError)
 		return
@@ -101,10 +120,12 @@ func (h *Handler) GoogleCallback(w http.ResponseWriter, r *http.Request) {
 	if token.RefreshToken != "" {
 		//save the google token to db
 		if err := h.userRepo.UpdateRefreshToken(ctx, u.ID, token.RefreshToken); err != nil {
-			log.Fatalf("failed to save google refresh token: %v", err)
+			slog.Error("failed to save google refresh token", "err", err)
+			http.Error(w, "failed to save token", http.StatusInternalServerError)
+			return
 		}
-	}else{
-		log.Printf("no google refresh token received, using existing one")
+	} else {
+		slog.Warn("no google refresh token received; using existing one")
 	}
 
 	accessToken, err := auth.GenerateAccessToken(
@@ -117,17 +138,19 @@ func (h *Handler) GoogleCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	appRefreshToken, err := auth.GenerateRefreshToken(u.ID, u.Email) 
+	appRefreshToken, err := auth.GenerateRefreshToken(u.ID, u.Email)
 	if err != nil {
 		http.Error(w, "failed to generate refresh token", http.StatusInternalServerError)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{
-		"accessToken": accessToken,
-		"refreshToken" : appRefreshToken,
-	})
+	// Redirect to frontend with tokens in URL
+	redirectURL := fmt.Sprintf("%s/auth/callback?access_token=%s&refresh_token=%s",
+		h.frontendURL,
+		url.QueryEscape(accessToken),
+		url.QueryEscape(appRefreshToken),
+	)
+	http.Redirect(w, r, redirectURL, http.StatusTemporaryRedirect)
 }
 
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {

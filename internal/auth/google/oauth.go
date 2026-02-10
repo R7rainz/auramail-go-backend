@@ -7,6 +7,7 @@ import (
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
+	"google.golang.org/api/calendar/v3"
 	"google.golang.org/api/gmail/v1"
 	"google.golang.org/api/option"
 )
@@ -26,6 +27,7 @@ func NewOAuthConfig() *oauth2.Config {
 			"https://www.googleapis.com/auth/userinfo.email",
 			"https://www.googleapis.com/auth/userinfo.profile",
 			"https://www.googleapis.com/auth/gmail.readonly",
+			"https://www.googleapis.com/auth/calendar.events",
 		},
 		Endpoint: google.Endpoint,
 	}
@@ -44,4 +46,19 @@ func CreateGmailService(ctx context.Context, refreshToken string) (*gmail.Servic
 	httpClient := oauth2.NewClient(ctx, tokenSource)
 
 	return gmail.NewService(ctx, option.WithHTTPClient(httpClient))
+}
+
+// CreateCalendarService creates a Google Calendar service using the stored refresh token
+func CreateCalendarService(ctx context.Context, refreshToken string) (*calendar.Service, error) {
+	config := NewOAuthConfig()
+
+	token := &oauth2.Token{
+		RefreshToken: refreshToken,
+		TokenType:    "Bearer",
+	}
+
+	tokenSource := config.TokenSource(ctx, token)
+	httpClient := oauth2.NewClient(ctx, tokenSource)
+
+	return calendar.NewService(ctx, option.WithHTTPClient(httpClient))
 }
